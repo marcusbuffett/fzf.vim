@@ -543,6 +543,52 @@ function! fzf#vim#ag_raw(command_suffix, ...)
 endfunction
 
 " ------------------------------------------------------------------
+" Ag with all options
+" ------------------------------------------------------------------
+function! s:agp_to_qf(line)
+  let parts = split(a:line, ':')
+  return {'filename': &acd ? fnamemodify(parts[0], ':p') : parts[0], 'lnum': parts[1], 'col': parts[2],
+        \ 'text': join(parts[3:], ':')}
+endfunction
+
+function! s:agp_handler(lines)
+  if len(a:lines) < 2
+    return
+  endif
+
+  let cmd = get(get(g:, 'fzf_action', s:default_action), a:lines[0], 'e')
+  let list = map(a:lines[1:], 's:ag_to_qf(v:val)')
+
+  let first = list[0]
+  try
+    call s:open(cmd, first.filename)
+    execute first.lnum
+    execute 'normal!' first.col.'|zz'
+  catch
+  endtry
+
+  if len(list) > 1
+    call setqflist(list)
+    copen
+    wincmd p
+  endif
+endfunction
+
+" query, [[ag options], options]
+function! fzf#vim#agp(query, ...)
+  let args = copy(a:000)
+  " let ag_opts = len(args) > 1 ? remove(args, 0) : ''
+  return s:fzf(fzf#vim#wrap({
+  \ 'source':  printf('ag --nogroup --column --color %s',
+  \                   a:query),
+  \ 'sink*':    s:function('s:agp_handler'),
+  \ 'options': '--ansi --delimiter : --nth 4..,.. --prompt "Ag> " '.
+  \            '--multi --bind alt-a:select-all,alt-d:deselect-all '.
+  \            '--color hl:68,hl+:110'}), args)
+endfunction
+
+
+" ------------------------------------------------------------------
 " BTags
 " ------------------------------------------------------------------
 function! s:btags_source(tag_cmds)
